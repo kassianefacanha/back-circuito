@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: meu-backend
+    runtime: node
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: MONGODB_URI
+        value: SECRET_PASS
+      - key: PORT
+        value: 10000
