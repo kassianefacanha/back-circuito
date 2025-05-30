@@ -132,11 +132,12 @@ exports.resetPassword = asyncHandler(async (req, res, next) => {
 // @route   POST /api/v1/auth/register
 // @access  Public
 exports.register = asyncHandler(async (req, res, next) => {
-  const { name, email, password, phone } = req.body;
+
+  const { name, email, password, phone,  confirmPassword } = req.body;
 
   // Validação básica
-  if (!name || !email || !password || !phone) {
-      res.status(400).json({
+  if (!name || !email || !password || !phone || !confirmPassword) {
+    res.status(400).json({
       success: false,
       message: "Por favor, preencha todos os campos"
     });
@@ -157,6 +158,7 @@ exports.register = asyncHandler(async (req, res, next) => {
     name,
     email,
     password,
+    confirmPassword,
     phone
   });
 
@@ -192,7 +194,10 @@ exports.login = asyncHandler(async (req, res, next) => {
   const user = await User.findOne({ email }).select('+password');
 
   if (!user) {
-    return next(new ErrorResponse('Credenciais inválidas', 401));
+    res.status(401).json({
+      success: false,
+      message: 'Credenciais inválidas'
+    })
   }
 
   // Check if password matches
@@ -200,9 +205,9 @@ exports.login = asyncHandler(async (req, res, next) => {
 
   if (!isMatch) {
     res.status(401).json({
-    success: false,
-    message: 'Credenciais inválidas'
-  });
+      success: false,
+      message: 'Credenciais inválidas'
+    });
 
   }
 
