@@ -50,8 +50,20 @@ app.use(xss());
 
 // Rate limiting
 const limiter = rateLimit({
-  windowMs: 10 * 60 * 1000, // 10 mins
-  max: 100
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 10000, // limite aumentado para 10000 requisições por IP
+  message: {
+    success: false,
+    error: 'Muitas requisições deste IP, por favor tente novamente mais tarde'
+  },
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  skip: (req) => {
+    // Pular rate limiting para rotas críticas ou para admin
+    return req.path === '/api/v1/auth/login' || 
+           req.path === '/api/v1/auth/register' ||
+           req.user?.role === 'admin';
+  }
 });
 app.use(limiter);
 
