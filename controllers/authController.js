@@ -10,24 +10,24 @@ const jwt = require('jsonwebtoken');
 // @route   POST /api/v1/auth/forgotpassword
 // @access  Public
 exports.forgotPassword = asyncHandler(async (req, res, next) => {
-    const user = await User.findOne({ email: req.body.email });
+  const user = await User.findOne({ email: req.body.email });
 
-    if (!user) {
-        return next(new ErrorResponse('Não há usuário com esse email', 404));
-    }
+  if (!user) {
+    return next(new ErrorResponse('Não há usuário com esse email', 404));
+  }
 
-    // Gerar código de 6 dígitos
-    const resetCode = user.generateResetPasswordCode();
-    await user.save({ validateBeforeSave: false });
+  // Gerar código de 6 dígitos
+  const resetCode = user.generateResetPasswordCode();
+  await user.save({ validateBeforeSave: false });
 
-    const message = `Seu código de redefinição de senha é: ${resetCode}\n\nEste código expira em 10 minutos.`;
+  const message = `Seu código de redefinição de senha é: ${resetCode}\n\nEste código expira em 10 minutos.`;
 
-    try {
-        await sendEmail({
-            email: user.email,
-            subject: 'Código de redefinição de senha',
-            message,
-            html: `
+  try {
+    await sendEmail({
+      email: user.email,
+      subject: 'Código de redefinição de senha',
+      message,
+      html: `
                 <div style="font-family: Arial, sans-serif; line-height: 1.6;">
                     <h2>Redefinição de Senha</h2>
                     <p>Seu código de verificação é:</p>
@@ -37,21 +37,21 @@ exports.forgotPassword = asyncHandler(async (req, res, next) => {
                     <p>Este código expira em 10 minutos.</p>
                 </div>
             `
-        });
+    });
 
-        res.status(200).json({ 
-            success: true, 
-            data: 'Código de redefinição enviado por email' 
-        });
-    } catch (err) {
-        console.error('Erro no envio de email:', err);
-        
-        user.resetPasswordCode = undefined;
-        user.resetPasswordExpire = undefined;
-        await user.save({ validateBeforeSave: false });
+    res.status(200).json({
+      success: true,
+      data: 'Código de redefinição enviado por email'
+    });
+  } catch (err) {
+    console.error('Erro no envio de email:', err);
 
-        return next(new ErrorResponse('O email não pôde ser enviado. Por favor, tente novamente.', 500));
-    }
+    user.resetPasswordCode = undefined;
+    user.resetPasswordExpire = undefined;
+    await user.save({ validateBeforeSave: false });
+
+    return next(new ErrorResponse('O email não pôde ser enviado. Por favor, tente novamente.', 500));
+  }
 });
 // @desc    Logout user
 // @route   POST /api/v1/auth/logout
@@ -72,78 +72,109 @@ exports.logout = asyncHandler(async (req, res, next) => {
 // @route   POST /api/v1/auth/verifycode
 // @access  Public
 exports.verifyResetCode = asyncHandler(async (req, res, next) => {
-    const user = await User.findOne({ 
-        email: req.body.email,
-        resetPasswordExpire: { $gt: Date.now() }
-    }).select('+resetPasswordCode');
+  const user = await User.findOne({
+    email: req.body.email,
+    resetPasswordExpire: { $gt: Date.now() }
+  }).select('+resetPasswordCode');
 
-    if (!user) {
-        return next(new ErrorResponse('Código expirado ou email inválido', 400));
-    }
-console.log(req.body.code)
-    // Verificar se o código está correto
-    const isValid = user.isValidResetCode(req.body.code);
+  if (!user) {
+    return next(new ErrorResponse('Código expirado ou email inválido', 400));
+  }
 
-    if (!isValid) {
-        return next(new ErrorResponse('Código inválido', 400));
-    }
+  // Verificar se o código está correto
+  const isValid = user.isValidResetCode(req.body.code);
 
-    res.status(200).json({ 
-        success: true, 
-        data: 'Código válido' 
-    });
+  if (!isValid) {
+    return next(new ErrorResponse('Código inválido', 400));
+  }
+
+  res.status(200).json({
+    success: true,
+    data: 'Código válido'
+  });
 });
 
 // @desc    Redefinir senha com código
 // @route   PUT /api/v1/auth/resetpassword
 // @access  Public
 exports.resetPassword = asyncHandler(async (req, res, next) => {
-    const user = await User.findOne({ 
-        email: req.body.email,
-        resetPasswordExpire: { $gt: Date.now() }
-    }).select('+resetPasswordCode');
+  const user = await User.findOne({
+    email: req.body.email,
+    resetPasswordExpire: { $gt: Date.now() }
+  }).select('+resetPasswordCode');
 
-    if (!user) {
-        return next(new ErrorResponse('Código expirado ou email inválido', 400));
-    }
+  if (!user) {
+    return next(new ErrorResponse('Código expirado ou email inválido', 400));
+  }
 
-    // Verificar se o código está correto
-    const isValid = user.isValidResetCode(req.body.code);
+  // Verificar se o código está correto
+  const isValid = user.isValidResetCode(req.body.code);
 
-    if (!isValid) {
-        return next(new ErrorResponse('Código inválido', 400));
-    }
+  if (!isValid) {
+    return next(new ErrorResponse('Código inválido', 400));
+  }
 
-    // Verificar se as senhas coincidem
-    if (req.body.password !== req.body.confirmPassword) {
-        return next(new ErrorResponse('As senhas não coincidem', 400));
-    }
+  // Verificar se as senhas coincidem
+  if (req.body.password !== req.body.confirmPassword) {
+    return next(new ErrorResponse('As senhas não coincidem', 400));
+  }
 
-    // Atualizar a senha
-    user.password = req.body.password;
-    user.resetPasswordCode = undefined;
-    user.resetPasswordExpire = undefined;
-    await user.save();
+  // Atualizar a senha
+  user.password = req.body.password;
+  user.resetPasswordCode = undefined;
+  user.resetPasswordExpire = undefined;
+  await user.save();
 
-    // Enviar resposta com token
-    sendTokenResponse(user, 200, res);
+  // Enviar resposta com token
+  sendTokenResponse(user, 200, res);
 });
 // @desc    Register user
 // @route   POST /api/v1/auth/register
 // @access  Public
 exports.register = asyncHandler(async (req, res, next) => {
-  const { name, email, phone, gender, password, confirmPassword, city } = req.body;
+  const { name, email, password, phone } = req.body;
 
-  // Create user
+  // Validação básica
+  if (!name || !email || !password || !phone) {
+      res.status(400).json({
+      success: false,
+      message: "Por favor, preencha todos os campos"
+    });
+  }
+
+  // Verificar se usuário já existe
+  const existingUser = await User.findOne({ email });
+
+  if (existingUser) {
+    res.status(400).json({
+      success: false,
+      message: "Email já cadastrado"
+    });
+  }
+
+  // Criar usuário
   const user = await User.create({
     name,
     email,
-    phone,
     password,
-    confirmPassword,
+    phone
   });
 
-  sendTokenResponse(user, 200, res);
+  // Gerar token JWT
+  const token = user.getSignedJwtToken();
+
+  // Retornar resposta com token
+  res.status(201).json({
+    success: true,
+    token,
+    data: {
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      role: user.role
+    }
+  });
 });
 
 // @desc    Login user
@@ -168,7 +199,11 @@ exports.login = asyncHandler(async (req, res, next) => {
   const isMatch = await user.matchPassword(password);
 
   if (!isMatch) {
-    return next(new ErrorResponse('Credenciais inválidas', 401));
+    res.status(401).json({
+    success: false,
+    message: 'Credenciais inválidas'
+  });
+
   }
 
   sendTokenResponse(user, 200, res);

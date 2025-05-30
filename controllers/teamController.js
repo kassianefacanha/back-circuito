@@ -143,6 +143,9 @@ exports.getTeam = asyncHandler(async (req, res, next) => {
 // @desc    Create team
 // @route   POST /api/v1/teams
 // @access  Private
+// @desc    Create team
+// @route   POST /api/v1/teams
+// @access  Private
 exports.createTeam = asyncHandler(async (req, res, next) => {
   try {
     // Processar os dados do time
@@ -156,8 +159,65 @@ exports.createTeam = asyncHandler(async (req, res, next) => {
     } catch (error) {
       return res.status(400).json({
         success: false,
-        error: 'Formato de dados inválido'
+        error: 'Formato de dados inválido. Verifique a estrutura dos dados enviados.'
       });
+    }
+
+    // Verificar duplicatas antes de tentar criar
+    const existingTeam = await Team.findOne({ teamName: teamData.teamName });
+    if (existingTeam) {
+      return res.status(409).json({
+        success: false,
+        error: 'Já existe um time com este nome. Por favor, escolha outro nome.'
+      });
+    }
+
+    // Verificar CPF/RG duplicados nos atletas
+    if (teamData.athletes && teamData.athletes.length > 0) {
+      const cpfRgList = teamData.athletes.map(a => ({ cpf: a.cpf, rg: a.rg }));
+      
+      // Verificar CPFs duplicados na requisição
+      const cpfs = cpfRgList.map(a => a.cpf);
+      if (new Set(cpfs).size !== cpfs.length) {
+        return res.status(400).json({
+          success: false,
+          error: 'Existem CPFs duplicados na lista de atletas.'
+        });
+      }
+
+      // Verificar RGs duplicados na requisição
+      const rgs = cpfRgList.map(a => a.rg);
+      if (new Set(rgs).size !== rgs.length) {
+        return res.status(400).json({
+          success: false,
+          error: 'Existem RGs duplicados na lista de atletas.'
+        });
+      }
+
+      // Verificar no banco de dados
+      for (const athlete of teamData.athletes) {
+        const existingAthlete = await Team.findOne({
+          'athletes.cpf': athlete.cpf
+        });
+        
+        if (existingAthlete) {
+          return res.status(409).json({
+            success: false,
+            error: `O CPF ${athlete.cpf} já está cadastrado em outro time.`
+          });
+        }
+
+        const existingAthleteByRg = await Team.findOne({
+          'athletes.rg': athlete.rg
+        });
+        
+        if (existingAthleteByRg) {
+          return res.status(409).json({
+            success: false,
+            error: `O RG ${athlete.rg} já está cadastrado em outro time.`
+          });
+        }
+      }
     }
 
     // Associar fotos aos atletas
@@ -181,9 +241,29 @@ exports.createTeam = asyncHandler(async (req, res, next) => {
     res.status(201).json({ success: true, data: team });
   } catch (error) {
     console.error('Erro ao criar time:', error);
+    
+    // Tratamento específico para erros de duplicata do MongoDB
+    if (error.name === 'MongoServerError' && error.code === 11000) {
+      let errorMessage = 'Erro de duplicata: ';
+      
+      if (error.message.includes('teamName_1')) {
+        errorMessage = 'Já existe um time com este nome. Por favor, escolha outro nome.';
+      } else if (error.message.includes('athletes.cpf_1')) {
+        errorMessage = 'Um ou mais CPFs já estão cadastrados em outros times.';
+      } else if (error.message.includes('athletes.rg_1')) {
+        errorMessage = 'Um ou mais RGs já estão cadastrados em outros times.';
+      }
+      
+      return res.status(409).json({
+        success: false,
+        error: errorMessage
+      });
+    }
+    
+    // Erros gerais
     res.status(500).json({
       success: false,
-      error: 'Erro interno no servidor'
+      error: 'Ocorreu um erro ao processar sua solicitação. Por favor, tente novamente mais tarde.'
     });
   }
 });
