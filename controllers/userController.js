@@ -51,7 +51,6 @@ exports.createUser = asyncHandler(async (req, res, next) => {
 
   // Verificar se usuário já existe
   const existingUser = await User.findOne({ email });
-
   if (existingUser) {
     return next(new ErrorResponse('Email já cadastrado', 400));
   }

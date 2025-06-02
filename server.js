@@ -9,8 +9,6 @@ const helmet = require('helmet');
 const xss = require('xss-clean');
 const rateLimit = require('express-rate-limit');
 const hpp = require('hpp');
-const uploadRoutes = require('./routes/uploadRoutes');
-const driveRoutes = require('./routes/driveRoutes');
 
 // Load env vars
 require('dotenv').config();
@@ -73,13 +71,7 @@ app.use(limiter);
 app.use(hpp());
 
 // Enable CORS
-app.use(cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true,
-    exposedHeaders: ['Content-Disposition']
-}));
+app.use(cors());
 
 // Set static folder
 app.use(express.static(path.join(__dirname, 'public')));
@@ -92,8 +84,7 @@ app.use('/api/v1/scoreboards', scoreboards);
 app.use('/api/v1/matches', matches);
 app.use('/api/v1/stats', stats);
 app.use('/api/v1/users', userRoutes);
-app.use('/api/v1/upload', uploadRoutes);
-app.use('/api/v1/drive', driveRoutes);
+
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
