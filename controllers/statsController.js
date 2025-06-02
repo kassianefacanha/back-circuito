@@ -10,7 +10,23 @@ const asyncHandler = require('../middlewares/async');
 // @access  Public
 exports.getStats = asyncHandler(async (req, res, next) => {
   try {
-    // Users stats
+    // [NOVO] Resumo por modalidade, categoria e naipe
+    const modalitySummary = await Team.aggregate([
+      {
+        $group: {
+          _id: {
+            modality: '$modality',
+            category: '$category',
+            gender: '$gender'
+          },
+          teamCount: { $sum: 1 },
+          athleteCount: { $sum: { $size: '$athletes' } }
+        }
+      },
+      { $sort: { '_id.modality': 1, '_id.category': 1, '_id.gender': 1 } }
+    ]);
+
+    // Users stats (original)
     const totalUsers = await User.countDocuments();
     const usersByCity = await User.aggregate([
       { $group: { _id: '$city', count: { $sum: 1 } } }
@@ -19,7 +35,7 @@ exports.getStats = asyncHandler(async (req, res, next) => {
       { $group: { _id: '$gender', count: { $sum: 1 } } }
     ]);
 
-    // Teams stats
+    // Teams stats (original)
     const totalTeams = await Team.countDocuments();
     const teamsByCity = await Team.aggregate([
       { $group: { _id: '$city', count: { $sum: 1 } } }
@@ -34,7 +50,7 @@ exports.getStats = asyncHandler(async (req, res, next) => {
       { $group: { _id: '$gender', count: { $sum: 1 } } }
     ]);
 
-    // Athletes stats
+    // Athletes stats (original)
     const athletesByGender = await Team.aggregate([
       { $unwind: '$athletes' },
       { 
@@ -44,7 +60,6 @@ exports.getStats = asyncHandler(async (req, res, next) => {
         } 
       }
     ]);
-
     const athletesByModality = await Team.aggregate([
       { $unwind: '$athletes' },
       { 
@@ -54,7 +69,6 @@ exports.getStats = asyncHandler(async (req, res, next) => {
         } 
       }
     ]);
-
     const athletesByCategory = await Team.aggregate([
       { $unwind: '$athletes' },
       { 
@@ -64,14 +78,13 @@ exports.getStats = asyncHandler(async (req, res, next) => {
         } 
       }
     ]);
-
     const totalAthletesResult = await Team.aggregate([
       { $unwind: '$athletes' },
       { $count: 'total' }
     ]);
     const totalAthletes = totalAthletesResult[0] ? totalAthletesResult[0].total : 0;
 
-    // Matches stats
+    // Matches stats (original)
     const totalMatches = await Match.countDocuments();
     const matchesByStatus = await Match.aggregate([
       { $group: { _id: '$status', count: { $sum: 1 } } }
@@ -83,7 +96,7 @@ exports.getStats = asyncHandler(async (req, res, next) => {
       { $group: { _id: '$city', count: { $sum: 1 } } }
     ]);
 
-    // News stats
+    // News stats (original)
     const totalNews = await News.countDocuments();
     const newsByCity = await News.aggregate([
       { $group: { _id: '$cidade', count: { $sum: 1 } } }
@@ -92,7 +105,7 @@ exports.getStats = asyncHandler(async (req, res, next) => {
       { $group: { _id: '$modalidade', count: { $sum: 1 } } }
     ]);
 
-    // Scoreboard stats
+    // Scoreboard stats (original)
     const scoreboardStats = await Scoreboard.aggregate([
       {
         $group: {
@@ -109,6 +122,10 @@ exports.getStats = asyncHandler(async (req, res, next) => {
     res.status(200).json({
       success: true,
       data: {
+        // [NOVO] Resumo por modalidade
+        modalitySummary,
+        
+        // Estatísticas originais (sem modificações)
         users: {
           total: totalUsers,
           byCity: usersByCity,
@@ -154,7 +171,7 @@ exports.getStatsByCity = asyncHandler(async (req, res, next) => {
   try {
     const city = req.params.city;
 
-    // Validate city
+    // Validação (original)
     if (!['Fortaleza', 'Aquiraz'].includes(city)) {
       return res.status(400).json({
         success: false,
@@ -162,14 +179,31 @@ exports.getStatsByCity = asyncHandler(async (req, res, next) => {
       });
     }
 
-    // Users stats
+    // [NOVO] Resumo por modalidade (filtrado por cidade)
+    const modalitySummary = await Team.aggregate([
+      { $match: { city } },
+      {
+        $group: {
+          _id: {
+            modality: '$modality',
+            category: '$category',
+            gender: '$gender'
+          },
+          teamCount: { $sum: 1 },
+          athleteCount: { $sum: { $size: '$athletes' } }
+        }
+      },
+      { $sort: { '_id.modality': 1, '_id.category': 1, '_id.gender': 1 } }
+    ]);
+
+    // Users stats (original)
     const totalUsers = await User.countDocuments({ city });
     const usersByGender = await User.aggregate([
       { $match: { city } },
       { $group: { _id: '$gender', count: { $sum: 1 } } }
     ]);
 
-    // Teams stats
+    // Teams stats (original)
     const totalTeams = await Team.countDocuments({ city });
     const teamsByModality = await Team.aggregate([
       { $match: { city } },
@@ -184,7 +218,7 @@ exports.getStatsByCity = asyncHandler(async (req, res, next) => {
       { $group: { _id: '$gender', count: { $sum: 1 } } }
     ]);
 
-    // Athletes stats
+    // Athletes stats (original)
     const athletesByGender = await Team.aggregate([
       { $match: { city } },
       { $unwind: '$athletes' },
@@ -195,7 +229,6 @@ exports.getStatsByCity = asyncHandler(async (req, res, next) => {
         } 
       }
     ]);
-
     const athletesByModality = await Team.aggregate([
       { $match: { city } },
       { $unwind: '$athletes' },
@@ -206,7 +239,6 @@ exports.getStatsByCity = asyncHandler(async (req, res, next) => {
         } 
       }
     ]);
-
     const athletesByCategory = await Team.aggregate([
       { $match: { city } },
       { $unwind: '$athletes' },
@@ -217,7 +249,6 @@ exports.getStatsByCity = asyncHandler(async (req, res, next) => {
         } 
       }
     ]);
-
     const totalAthletesResult = await Team.aggregate([
       { $match: { city } },
       { $unwind: '$athletes' },
@@ -225,7 +256,7 @@ exports.getStatsByCity = asyncHandler(async (req, res, next) => {
     ]);
     const totalAthletes = totalAthletesResult[0] ? totalAthletesResult[0].total : 0;
 
-    // Matches stats
+    // Matches stats (original)
     const totalMatches = await Match.countDocuments({ city });
     const matchesByStatus = await Match.aggregate([
       { $match: { city } },
@@ -236,14 +267,14 @@ exports.getStatsByCity = asyncHandler(async (req, res, next) => {
       { $group: { _id: '$modalidade', count: { $sum: 1 } } }
     ]);
 
-    // News stats
+    // News stats (original)
     const totalNews = await News.countDocuments({ cidade: city });
     const newsByModality = await News.aggregate([
       { $match: { cidade: city } },
       { $group: { _id: '$modalidade', count: { $sum: 1 } } }
     ]);
 
-    // Scoreboard stats
+    // Scoreboard stats (original)
     const scoreboardStats = await Scoreboard.aggregate([
       { $match: { city } },
       {
@@ -261,6 +292,7 @@ exports.getStatsByCity = asyncHandler(async (req, res, next) => {
     res.status(200).json({
       success: true,
       data: {
+        modalitySummary,
         city,
         users: {
           total: totalUsers,
