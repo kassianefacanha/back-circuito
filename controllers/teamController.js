@@ -286,7 +286,7 @@ exports.deleteTeam = asyncHandler(async (req, res, next) => {
     );
   }
 
-  // Make sure user is team owner or admin
+  // Verifica se o usuário é dono do time ou admin
   if (team.user.toString() !== req.user.id && req.user.role !== 'admin') {
     return next(
       new ErrorResponse(
@@ -296,10 +296,12 @@ exports.deleteTeam = asyncHandler(async (req, res, next) => {
     );
   }
 
-  await team.remove();
+  // Substitui team.remove() por:
+  await Team.deleteOne({ _id: req.params.id });
 
   res.status(200).json({
     success: true,
     data: {}
   });
 });
+
