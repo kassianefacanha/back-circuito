@@ -78,32 +78,30 @@ UserSchema.methods.getSignedJwtToken = function () {
     });
 };
 
-// Gerar código de redefinição de 6 dígitos
-UserSchema.methods.generateResetPasswordCode = function () {
-    // Gerar código numérico de 6 dígitos
-    const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
-
-    // Hash do código para armazenamento seguro
-    this.resetPasswordCode = crypto
-        .createHash('sha256')
-        .update(resetCode)
-        .digest('hex');
-
-    // Definir expiração (10 minutos)
-    this.resetPasswordExpire = Date.now() + 10 * 60 * 1000;
-
-    return resetCode;
+// Método para gerar e armazenar código de reset
+UserSchema.methods.generateResetPasswordCode = function() {
+  // Gera código numérico de 6 dígitos
+  const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
+  
+  // Armazena o código original (não o hash) para comparação direta
+  this.resetPasswordCode = resetCode;
+  
+  // Define expiração (10 minutos)
+  this.resetPasswordExpire = Date.now() + 10 * 60 * 1000;
+  
+  return resetCode;
 };
 
-// Verificar se o código de reset é válido
-UserSchema.methods.isValidResetCode = function (code) {
-    const hashedCode = crypto
-        .createHash('sha256')
-        .update(code)
-        .digest('hex');
-
-    return hashedCode === this.resetPasswordCode &&
-        this.resetPasswordExpire > Date.now();
+// Método para verificar o código de reset
+UserSchema.methods.isValidResetCode = function(code) {
+  // Verifica se há código e se não expirou
+  if (!this.resetPasswordCode || !this.resetPasswordExpire) {
+    return false;
+  }
+  
+  // Comparação direta (case sensitive) e verificação de tempo
+  return this.resetPasswordCode === code.toString().trim() && 
+         this.resetPasswordExpire > Date.now();
 };
 
 module.exports = mongoose.model('User', UserSchema);

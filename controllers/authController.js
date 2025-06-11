@@ -16,10 +16,11 @@ exports.forgotPassword = asyncHandler(async (req, res, next) => {
     return next(new ErrorResponse('Não há usuário com esse email', 404));
   }
 
-  // Gerar código de 6 dígitos
+  // Gera e armazena o código (já retorna o código legível)
   const resetCode = user.generateResetPasswordCode();
   await user.save({ validateBeforeSave: false });
 
+  // Mensagem do email
   const message = `Seu código de redefinição de senha é: ${resetCode}\n\nEste código expira em 10 minutos.`;
 
   try {
@@ -28,15 +29,15 @@ exports.forgotPassword = asyncHandler(async (req, res, next) => {
       subject: 'Código de redefinição de senha',
       message,
       html: `
-                <div style="font-family: Arial, sans-serif; line-height: 1.6;">
-                    <h2>Redefinição de Senha</h2>
-                    <p>Seu código de verificação é:</p>
-                    <h3 style="background: #f4f4f4; padding: 10px; display: inline-block;">
-                        ${resetCode}
-                    </h3>
-                    <p>Este código expira em 10 minutos.</p>
-                </div>
-            `
+        <div style="font-family: Arial, sans-serif; line-height: 1.6;">
+          <h2>Redefinição de Senha</h2>
+          <p>Seu código de verificação é:</p>
+          <h3 style="background: #f4f4f4; padding: 10px; display: inline-block;">
+            ${resetCode}
+          </h3>
+          <p>Este código expira em 10 minutos.</p>
+        </div>
+      `
     });
 
     res.status(200).json({
@@ -46,6 +47,7 @@ exports.forgotPassword = asyncHandler(async (req, res, next) => {
   } catch (err) {
     console.error('Erro no envio de email:', err);
 
+    // Limpa os campos em caso de erro
     user.resetPasswordCode = undefined;
     user.resetPasswordExpire = undefined;
     await user.save({ validateBeforeSave: false });
@@ -72,20 +74,26 @@ exports.logout = asyncHandler(async (req, res, next) => {
 // @route   POST /api/v1/auth/verifycode
 // @access  Public
 exports.verifyResetCode = asyncHandler(async (req, res, next) => {
-  const user = await User.findOne({
-    email: req.body.email,
-    resetPasswordExpire: { $gt: Date.now() }
-  }).select('+resetPasswordCode');
+  const { email, code } = req.body;
 
-  if (!user) {
-    return next(new ErrorResponse('Código expirado ou email inválido', 400));
+  if (!email || !code) {
+    return next(new ErrorResponse('Email e código são obrigatórios', 400));
   }
 
-  // Verificar se o código está correto
-  const isValid = user.isValidResetCode(req.body.code);
+  // Busca usuário incluindo os campos normalmente ocultos
+  const user = await User.findOne({
+    email: email
+  }).select('+resetPasswordCode +resetPasswordExpire');
+
+  if (!user) {
+    return next(new ErrorResponse('Email inválido', 400));
+  }
+
+  // Verifica se o código é válido
+  const isValid = user.isValidResetCode(code);
 
   if (!isValid) {
-    return next(new ErrorResponse('Código inválido', 400));
+    return next(new ErrorResponse('Código inválido ou expirado', 400));
   }
 
   res.status(200).json({
@@ -98,42 +106,77 @@ exports.verifyResetCode = asyncHandler(async (req, res, next) => {
 // @route   PUT /api/v1/auth/resetpassword
 // @access  Public
 exports.resetPassword = asyncHandler(async (req, res, next) => {
-  const user = await User.findOne({
+  console.log('Dados recebidos:', {
     email: req.body.email,
-    resetPasswordExpire: { $gt: Date.now() }
-  }).select('+resetPasswordCode');
+    code: req.body.code,
+    password: req.body.password,
+    confirmPassword: req.body.confirmPassword
+  });
+  // Extrair dados do corpo da requisição
+  const { email, code, password, confirmPassword } = req.body;
 
-  if (!user) {
-    return next(new ErrorResponse('Código expirado ou email inválido', 400));
-  }
-
-  // Verificar se o código está correto
-  const isValid = user.isValidResetCode(req.body.code);
-
-  if (!isValid) {
-    return next(new ErrorResponse('Código inválido', 400));
+  // Verificar campos obrigatórios
+  if (!email || !code || !password || !confirmPassword) {
+    return next(new ErrorResponse('Todos os campos são obrigatórios', 400));
   }
 
   // Verificar se as senhas coincidem
-  if (req.body.password !== req.body.confirmPassword) {
+  if (password !== confirmPassword) {
     return next(new ErrorResponse('As senhas não coincidem', 400));
   }
 
-  // Atualizar a senha
-  user.password = req.body.password;
+  // Buscar usuário incluindo campos de reset
+  const user = await User.findOne({ email: email.toLowerCase() })
+    .select('+resetPasswordCode +resetPasswordExpire');
+
+  if (!user) {
+    return next(new ErrorResponse('Usuário não encontrado', 404));
+  }
+
+  // Verificar se há código de reset pendente
+  if (!user.resetPasswordCode || !user.resetPasswordExpire) {
+    return next(new ErrorResponse('Nenhum pedido de reset de senha encontrado', 400));
+  }
+
+  // Verificar validade do código
+  if (user.resetPasswordCode !== code.toString().trim()) {
+    return next(new ErrorResponse('Código de reset inválido', 400));
+  }
+
+  if (user.resetPasswordExpire < Date.now()) {
+    return next(new ErrorResponse('Código de reset expirado', 400));
+  }
+
+  // Atualizar senha
+  user.password = password;
   user.resetPasswordCode = undefined;
   user.resetPasswordExpire = undefined;
+
   await user.save();
 
-  // Enviar resposta com token
-  sendTokenResponse(user, 200, res);
+  // Enviar email de confirmação (opcional)
+  try {
+    await sendEmail({
+      email: user.email,
+      subject: 'Senha alterada com sucesso',
+      message: 'Sua senha foi redefinida com sucesso.'
+    });
+  } catch (err) {
+    console.error('Erro ao enviar email de confirmação:', err);
+    // Não interrompe o fluxo por falha no email
+  }
+
+  res.status(200).json({
+    success: true,
+    data: 'Senha redefinida com sucesso'
+  });
 });
 // @desc    Register user
 // @route   POST /api/v1/auth/register
 // @access  Public
 exports.register = asyncHandler(async (req, res, next) => {
 
-  const { name, email, password, phone,  confirmPassword } = req.body;
+  const { name, email, password, phone, confirmPassword } = req.body;
 
   // Validação básica
   if (!name || !email || !password || !phone || !confirmPassword) {
@@ -189,21 +232,22 @@ exports.login = asyncHandler(async (req, res, next) => {
   if (!email || !password) {
     return next(new ErrorResponse('Por favor, forneça um email e senha', 400));
   }
-
   // Check for user
   const user = await User.findOne({ email }).select('+password');
 
   if (!user) {
+    console.log('Usuário não existe ou Credenciais inválidas')
     res.status(401).json({
       success: false,
-      message: 'Credenciais inválidas'
+      message: 'Usuário não existe ou Credenciais inválidas'
     })
   }
 
   // Check if password matches
   const isMatch = await user.matchPassword(password);
-
+  
   if (!isMatch) {
+    console.log('Credenciais inválidas')
     res.status(401).json({
       success: false,
       message: 'Credenciais inválidas'
@@ -265,35 +309,6 @@ exports.updatePassword = asyncHandler(async (req, res, next) => {
   sendTokenResponse(user, 200, res);
 });
 
-
-// @desc    Reset password
-// @route   PUT /api/v1/auth/resetpassword/:resettoken
-// @access  Public
-exports.resetPassword = asyncHandler(async (req, res, next) => {
-  // Get hashed token
-  const resetPasswordToken = crypto
-    .createHash('sha256')
-    .update(req.params.resettoken)
-    .digest('hex');
-
-  const user = await User.findOne({
-    resetPasswordToken,
-    resetPasswordExpire: { $gt: Date.now() }
-  });
-
-  if (!user) {
-    return next(new ErrorResponse('Token inválido ou expirado', 400));
-  }
-
-  // Set new password
-  user.password = req.body.password;
-  user.confirmPassword = req.body.confirmPassword;
-  user.resetPasswordToken = undefined;
-  user.resetPasswordExpire = undefined;
-  await user.save();
-
-  sendTokenResponse(user, 200, res);
-});
 
 // Get token from model, create cookie and send response
 const sendTokenResponse = (user, statusCode, res) => {
