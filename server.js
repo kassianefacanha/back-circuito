@@ -24,6 +24,7 @@ const teams = require('./routes/teamRoutes');
 const news = require('./routes/newsRoutes');
 const scoreboards = require('./routes/scoreboardRoutes');
 const matches = require('./routes/matchRoutes');
+const categoryLimits= require('./routes/categoryLimitsRoutes');
 const stats = require('./routes/statsRoutes');
 const userRoutes = require('./routes/userRoutes');
 
@@ -94,6 +95,7 @@ app.use('/api/v1/stats', stats);
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/upload', uploadRoutes);
 app.use('/api/v1/drive', driveRoutes);
+app.use('/api/v1/category-limits', categoryLimits);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
