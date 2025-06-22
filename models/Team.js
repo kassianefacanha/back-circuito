@@ -8,11 +8,12 @@ const AthleteSchema = new mongoose.Schema({
   cpf: {
     type: String,
     required: [true, 'Por favor, adicione um CPF'],
-    unique: true
+    unique: false // Removemos unique aqui pois será tratado pelo índice composto
   },
   rg: {
     type: String,
-    required: [true, 'Por favor, adicione um RG']
+    required: [true, 'Por favor, adicione um RG'],
+    unique: false // Removemos unique aqui pois será tratado pelo índice composto
   },
   phone: {
     type: String,
@@ -131,5 +132,9 @@ const TeamSchema = new mongoose.Schema({
     default: Date.now
   }
 });
+
+// Índices compostos para garantir unicidade de CPF e RG por cidade
+TeamSchema.index({ 'athletes.cpf': 1, city: 1 }, { unique: true });
+TeamSchema.index({ 'athletes.rg': 1, city: 1 }, { unique: true });
 
 module.exports = mongoose.model('Team', TeamSchema);
