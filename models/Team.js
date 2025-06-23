@@ -134,7 +134,8 @@ const TeamSchema = new mongoose.Schema({
 });
 
 // Índices compostos para garantir unicidade de CPF e RG por cidade
-TeamSchema.index({ 'athletes.cpf': 1, city: 1 }, { unique: true });
-TeamSchema.index({ 'athletes.rg': 1, city: 1 }, { unique: true });
+TeamSchema.index({ city: 1, 'athletes.cpf': 1 }, { unique: true });
+TeamSchema.index({ city: 1, 'athletes.rg': 1 }, { unique: true });
+
 
 module.exports = mongoose.model('Team', TeamSchema);
