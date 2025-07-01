@@ -149,6 +149,7 @@ exports.resetPassword = asyncHandler(async (req, res, next) => {
 
   // Atualizar senha
   user.password = password;
+  user.confirmPassword = confirmPassword; 
   user.resetPasswordCode = undefined;
   user.resetPasswordExpire = undefined;
 
