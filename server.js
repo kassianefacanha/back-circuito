@@ -27,7 +27,7 @@ const matches = require('./routes/matchRoutes');
 const categoryLimits= require('./routes/categoryLimitsRoutes');
 const stats = require('./routes/statsRoutes');
 const userRoutes = require('./routes/userRoutes');
-
+const registrationStatus = require('./routes/registrationStatusRoutes');
 
 const app = express();
 
@@ -96,7 +96,7 @@ app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/upload', uploadRoutes);
 app.use('/api/v1/drive', driveRoutes);
 app.use('/api/v1/category-limits', categoryLimits);
-
+app.use('/api/v1/registration-status', registrationStatus)
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 // Error handling middleware
