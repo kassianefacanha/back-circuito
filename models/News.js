@@ -28,6 +28,14 @@ const NewsSchema = new mongoose.Schema({
     type: String,
     enum: ['Fortaleza', 'Aquiraz', 'Ambas'],
     required: [true, 'Por favor, especifique a cidade']
+  },
+  link: {
+    type: String,
+    match: [
+      /https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)/,
+      'Por favor, use um URL válido com HTTP ou HTTPS'
+    ],
+    default: ''
   }
 });
 
